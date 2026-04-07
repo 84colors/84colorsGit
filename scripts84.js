@@ -1,3 +1,5 @@
+console.log("yello");
+
 //Cards slider
 function initStackedCardsSlider() {
     document
