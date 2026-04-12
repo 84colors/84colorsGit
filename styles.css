@@ -6,7 +6,8 @@ section {
 section > div {
     width: 100%;
     max-width: 86rem !important;
-    /* background-color: blue; */
+    background-color: blue;
+    /* font-size: 200px; */
     margin-left: auto !important;
     margin-right: auto !important;
 }
