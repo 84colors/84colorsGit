@@ -3,3 +3,7 @@ bits-html/
 bits/
 package-lock.json
 package.json
+key.pem
+cert.pem
+.claude
+COMMANDS.md

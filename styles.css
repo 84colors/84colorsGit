@@ -1,0 +1,12 @@
+section {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+section > div {
+    width: 100%;
+    max-width: 86rem !important;
+    /* background-color: blue; */
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
