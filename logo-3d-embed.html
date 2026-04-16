@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>84 Logo 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+    </style>
+</head>
+<body>
+
+    <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+        import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+        import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+
+        // ── SVG source ────────────────────────────────────────────────────────────────
+        const SVG_SOURCE = `<svg width="218" height="218" viewBox="0 0 218 218" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2.37797 131.743C0.82096 124.407 1.02773e-05 116.799 0 109C0 103.866 0.355577 98.8148 1.04227 93.8698L73.1512 93.8692L22.2622 42.9801C28.7603 34.4559 36.4862 26.9185 45.1763 20.6312L94.8585 70.3134V0.910874C99.4875 0.311183 104.208 0 109 0C117.81 1.63353e-05 126.375 1.04723 134.579 3.0203V37.5213C134.579 89.5577 92.3949 131.742 40.3585 131.742L2.37797 131.743Z" fill="#F05431"/>
+<path d="M86.8309 180.127C86.8312 128.09 129.015 85.9061 181.052 85.906L215.547 85.9067C217.152 93.3502 218 101.076 218 109C218 114.013 217.66 118.946 217.005 123.779L148.259 123.779L197.341 172.861C191.05 181.549 183.509 189.271 174.982 195.765L126.552 147.335V216.593C120.838 217.518 114.975 218 109 218C101.404 218 93.989 217.223 86.8309 215.744V180.127Z" fill="#F05431"/>
+</svg>`;
+
+        // ── Renderer ──────────────────────────────────────────────────────────────────
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true,          // transparent background for Webflow
+            powerPreference: 'high-performance',
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // 1.5× is indistinguishable from 2× at ≤800px
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 4.2;
+        renderer.setClearColor(0x000000, 0); // fully transparent
+        document.body.appendChild(renderer.domElement);
+
+        // ── Scene & camera ────────────────────────────────────────────────────────────
+        const scene = new THREE.Scene();
+
+        // Orthographic camera: no perspective foreshortening, so the logo
+        // stays the same size regardless of depth during rotation.
+        const FRUSTUM = 260; // units — logo is 218 wide/tall, ~20px padding each side at 800px
+        const aspect = window.innerWidth / window.innerHeight;
+        const camera = new THREE.OrthographicCamera(
+            -FRUSTUM * aspect / 2,
+            FRUSTUM * aspect / 2,
+            FRUSTUM / 2,
+            -FRUSTUM / 2,
+            -500, 500
+        );
+        camera.position.set(0, 0, 100);
+
+        // ── Environment map ───────────────────────────────────────────────────────────
+        // Dark studio background with distinct high-contrast light panels —
+        // the classic technique for dramatic glass photography.
+        // High contrast between dark areas and bright panels is what gives
+        // glass its reflections, refractions, and specular sheen.
+        function buildEnvMap() {
+            // Higher resolution = sharper reflections on roughness:0 surfaces.
+            // PMREM uses mip 0 for perfectly smooth materials, so input detail matters.
+            const W = 2048, H = 1024;
+            const c = document.createElement('canvas');
+            c.width = W; c.height = H;
+            const ctx = c.getContext('2d');
+
+            // Near-black background — maximum contrast makes highlights pop like glass
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, W, H);
+
+            // Sharp point-like light — small radius = tight specular highlight on glass
+            function spot(x, y, r, color, alpha = 1) {
+                const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+                g.addColorStop(0, `rgba(${color},${alpha})`);
+                g.addColorStop(0.15, `rgba(${color},${alpha * 0.9})`);
+                g.addColorStop(0.4, `rgba(${color},${alpha * 0.3})`);
+                g.addColorStop(1, `rgba(${color},0)`);
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, W, H);
+            }
+
+            // Rectangular softbox — sharp elliptical panel, hard falloff
+            function panel(x, y, rx, ry, color, alpha = 1) {
+                const g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(rx, ry));
+                g.addColorStop(0, `rgba(${color},${alpha})`);
+                g.addColorStop(0.6, `rgba(${color},${alpha * 0.6})`);
+                g.addColorStop(1, `rgba(${color},0)`);
+                ctx.save();
+                ctx.beginPath();
+                ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+                ctx.fillStyle = g;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Key: warm yellow-white panel upper-left
+            panel(W * 0.17, H * 0.18, W * 0.12, H * 0.16, '255,240,180', 1.0);
+            spot(W * 0.17, H * 0.16, W * 0.04, '255,245,200', 1.0);
+
+            // Secondary key upper-right, deeper orange
+            panel(W * 0.80, H * 0.15, W * 0.06, H * 0.09, '255,180,60', 0.95);
+            spot(W * 0.80, H * 0.14, W * 0.02, '255,200,80', 1.0);
+
+            // Rim light — orange-amber
+            spot(W * 0.01, H * 0.42, W * 0.04, '255,160,40', 0.80);
+            spot(W * 0.99, H * 0.42, W * 0.04, '255,160,40', 0.80);
+
+            // Deep orange accent lower-left
+            spot(W * 0.28, H * 0.74, W * 0.06, '255,120,20', 0.50);
+
+            // Golden yellow accent lower-right
+            spot(W * 0.72, H * 0.70, W * 0.05, '255,210,50', 0.50);
+
+            // Overhead strip — warm yellow
+            const strip = ctx.createLinearGradient(0, 0, 0, H * 0.05);
+            strip.addColorStop(0, 'rgba(255,230,140,0.7)');
+            strip.addColorStop(1, 'rgba(255,230,140,0)');
+            ctx.fillStyle = strip;
+            ctx.fillRect(0, 0, W, H * 0.05);
+
+            const tex = new THREE.CanvasTexture(c);
+            tex.mapping = THREE.EquirectangularReflectionMapping;
+            tex.colorSpace = THREE.SRGBColorSpace;
+
+            const pmrem = new THREE.PMREMGenerator(renderer);
+            pmrem.compileEquirectangularShader();
+            const envMap = pmrem.fromEquirectangular(tex).texture;
+            tex.dispose();
+            pmrem.dispose();
+            return envMap;
+        }
+
+        // ── Load env map from assets/ (if present) else fall back to procedural ───────
+        // Drop any of these files into assets/ and it will be picked up automatically:
+        //   assets/env.hdr   ← recommended (HDR equirectangular, e.g. Poly Haven)
+        //   assets/env.exr   ← also HDR quality
+        //   assets/env.jpg   ← LDR equirectangular (lower quality but smaller file)
+        //   assets/env.png
+        const ENV_CANDIDATES = [
+            // 'white_home_studio_1k.hdr' removed — evenly lit, kills glass reflections
+            // Add a high-contrast studio HDR here if you want a custom env map
+            { path: 'assets/env.hdr', loader: 'hdr' },
+            { path: 'assets/env.exr', loader: 'exr' },
+            { path: 'assets/env.jpg', loader: 'ldr' },
+            { path: 'assets/env.png', loader: 'ldr' },
+        ];
+
+        async function fileExists(url) {
+            try {
+                const r = await fetch(url, { method: 'HEAD' });
+                return r.ok;
+            } catch { return false; }
+        }
+
+        async function loadEnvMap() {
+            const pmrem = new THREE.PMREMGenerator(renderer);
+            pmrem.compileEquirectangularShader();
+
+            for (const { path, loader } of ENV_CANDIDATES) {
+                if (!(await fileExists(path))) continue;
+
+                if (loader === 'hdr') {
+                    return new Promise((resolve) => {
+                        new RGBELoader().load(path, (tex) => {
+                            tex.mapping = THREE.EquirectangularReflectionMapping;
+                            const env = pmrem.fromEquirectangular(tex).texture;
+                            tex.dispose(); pmrem.dispose();
+                            resolve(env);
+                        });
+                    });
+                }
+
+                if (loader === 'exr') {
+                    return new Promise((resolve) => {
+                        new EXRLoader().load(path, (tex) => {
+                            tex.mapping = THREE.EquirectangularReflectionMapping;
+                            const env = pmrem.fromEquirectangular(tex).texture;
+                            tex.dispose(); pmrem.dispose();
+                            resolve(env);
+                        });
+                    });
+                }
+
+                if (loader === 'ldr') {
+                    return new Promise((resolve) => {
+                        new THREE.TextureLoader().load(path, (tex) => {
+                            tex.mapping = THREE.EquirectangularReflectionMapping;
+                            tex.colorSpace = THREE.SRGBColorSpace;
+                            const env = pmrem.fromEquirectangular(tex).texture;
+                            tex.dispose(); pmrem.dispose();
+                            resolve(env);
+                        });
+                    });
+                }
+            }
+
+            // Nothing found in assets/ — use procedural fallback
+            pmrem.dispose();
+            return buildEnvMap();
+        }
+
+        scene.environment = await loadEnvMap();
+        // No scene.background — keep transparent for Webflow
+
+        // ── Direct lights ─────────────────────────────────────────────────────────────
+        const keyLight = new THREE.DirectionalLight(0xfff0b0, 4.0);  // warm yellow-white
+        keyLight.position.set(-80, 120, 100);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0xff9030, 1.8); // orange fill
+        fillLight.position.set(100, -40, 80);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xffb020, 2.5);  // deep amber rim
+        rimLight.position.set(20, -60, -120);
+        scene.add(rimLight);
+
+        // ── Orange glass material ─────────────────────────────────────────────────────
+        const glassMaterial = new THREE.MeshPhysicalMaterial({
+            color: new THREE.Color(0xFF7B2C),
+            metalness: 0,
+            roughness: 0.0,
+            transmission: 0.98,
+            thickness: 22,
+            ior: 1.65,
+            transparent: true,
+            // envMapIntensity: 2.2,
+            specularIntensity: 2.0,
+            specularColor: new THREE.Color(0xffffff),
+            reflectivity: 1.0,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.0,
+            attenuationColor: new THREE.Color(0xffffff),
+            attenuationDistance: 40,
+            side: THREE.DoubleSide,
+        });
+
+        // ── Parse SVG & extrude ───────────────────────────────────────────────────────
+        const loader = new SVGLoader();
+        const svgData = loader.parse(SVG_SOURCE);
+
+        const extrudeSettings = {
+            depth: 22,
+            curveSegments: 24,  // smoothness of the SVG path curves (silhouette)
+            bevelEnabled: true,
+            bevelThickness: 8,
+            bevelSize: 4,
+            bevelOffset: 0,
+            bevelSegments: 24,  // smoothness of the bevel arc
+        };
+
+        const group = new THREE.Group();
+
+        // Crease angle: faces whose normals differ by MORE than this get a hard edge,
+        // faces below the threshold get smoothed. ~30° keeps bevel curves smooth
+        // while preserving the sharp 90° corner between front face and side wall.
+        const CREASE_ANGLE = THREE.MathUtils.degToRad(30);
+
+        svgData.paths.forEach((svgPath) => {
+            const shapes = SVGLoader.createShapes(svgPath);
+            shapes.forEach((shape) => {
+                const geometry = toCreasedNormals(
+                    new THREE.ExtrudeGeometry(shape, extrudeSettings),
+                    CREASE_ANGLE
+                );
+                const mesh = new THREE.Mesh(geometry, glassMaterial);
+                group.add(mesh);
+            });
+        });
+
+        // Center the group at origin.
+        // The Y-flip must be applied first: with scale.y = -1,
+        // world_y = position.y - local_y, so position.y must equal +center.y (not -center.y)
+        // to keep the centroid at world Y=0.
+        const box = new THREE.Box3().setFromObject(group);
+        const center = box.getCenter(new THREE.Vector3());
+        group.scale.y *= -1;
+        group.position.set(-center.x, center.y, -center.z);
+
+        scene.add(group);
+
+        // ── Mouse tracking ────────────────────────────────────────────────────────────
+        let targetRotX = 0;
+        let targetRotY = 0;
+        let currentRotX = 0;
+        let currentRotY = 0;
+
+        function applyMouse(nx, ny) {
+            targetRotY = nx * Math.PI * 0.11;
+            targetRotX = -ny * Math.PI * 0.08;
+            startRender(); // wake the loop if it has settled
+        }
+
+        // Direct mouse — works when the HTML is used inline (not iframe)
+        window.addEventListener('mousemove', (e) => {
+            applyMouse(
+                (e.clientX / window.innerWidth - 0.5) * 2,
+                (e.clientY / window.innerHeight - 0.5) * 2
+            );
+        });
+
+        // Touch support
+        window.addEventListener('touchmove', (e) => {
+            if (!e.touches.length) return;
+            const t = e.touches[0];
+            applyMouse(
+                (t.clientX / window.innerWidth - 0.5) * 2,
+                (t.clientY / window.innerHeight - 0.5) * 2
+            );
+        }, { passive: true });
+
+        // postMessage — works when embedded as an iframe.
+        // The parent Webflow page needs this snippet in its custom code:
+        //
+        //   document.addEventListener('mousemove', function(e) {
+        //     document.querySelectorAll('iframe').forEach(function(f) {
+        //       f.contentWindow.postMessage({
+        //         type: 'LOGO3D_MOUSE',
+        //         nx: (e.clientX / window.innerWidth  - 0.5) * 2,
+        //         ny: (e.clientY / window.innerHeight - 0.5) * 2
+        //       }, '*');
+        //     });
+        //   });
+        //   document.addEventListener('mouseleave', function() {
+        //     document.querySelectorAll('iframe').forEach(function(f) {
+        //       f.contentWindow.postMessage({ type: 'LOGO3D_RESET' }, '*');
+        //     });
+        //   });
+        //
+        window.addEventListener('message', (e) => {
+            if (e.data?.type === 'LOGO3D_MOUSE') applyMouse(e.data.nx, e.data.ny);
+            if (e.data?.type === 'LOGO3D_RESET') { targetRotX = 0; targetRotY = 0; }
+        });
+
+        window.addEventListener('mouseleave', () => { targetRotX = 0; targetRotY = 0; startRender(); });
+
+        // ── Resize handler ────────────────────────────────────────────────────────────
+        window.addEventListener('resize', () => {
+            const a = window.innerWidth / window.innerHeight;
+            camera.left = -FRUSTUM * a / 2;
+            camera.right = FRUSTUM * a / 2;
+            camera.top = FRUSTUM / 2;
+            camera.bottom = -FRUSTUM / 2;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ── Animation loop ────────────────────────────────────────────────────────────
+        const LERP = 0.06;
+        const SETTLE_EPS = 0.00005; // stop rendering once rotation delta is this small
+        let rafId = null;
+
+        function tick() {
+            const dx = targetRotX - currentRotX;
+            const dy = targetRotY - currentRotY;
+
+            currentRotX += dx * LERP;
+            currentRotY += dy * LERP;
+
+            group.rotation.x = currentRotX;
+            group.rotation.y = currentRotY;
+
+            renderer.render(scene, camera);
+
+            // Keep looping only while still converging; stop when settled
+            if (Math.abs(dx) > SETTLE_EPS || Math.abs(dy) > SETTLE_EPS) {
+                rafId = requestAnimationFrame(tick);
+            } else {
+                rafId = null;
+            }
+        }
+
+        function startRender() {
+            if (!rafId) rafId = requestAnimationFrame(tick);
+        }
+
+        // Kick off an initial render so the shape is visible before any mouse move
+        startRender();
+
+        // Pause when the tab is hidden, resume when visible again
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            } else {
+                startRender();
+            }
+        });
+
+        // Pause when scrolled out of view, resume when back in viewport
+        new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                startRender();
+            } else {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+        }, { threshold: 0.1 }).observe(renderer.domElement);
+    </script>
+</body>
+</html>
