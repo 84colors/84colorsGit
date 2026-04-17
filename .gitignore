@@ -1,6 +1,7 @@
 node_modules/
 bits-html/
 bits/
+unused/
 package-lock.json
 package.json
 key.pem

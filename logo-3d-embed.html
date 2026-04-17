@@ -250,18 +250,17 @@
             color: new THREE.Color(0xFF7B2C),
             metalness: 0,
             roughness: 0.0,
-            transmission: 0.98,
-            thickness: 22,
+            transmission: 0.99,
+            thickness: 50,             // higher than geometry depth = stronger refraction bend
             ior: 1.65,
             transparent: true,
-            // envMapIntensity: 2.2,
             specularIntensity: 2.0,
             specularColor: new THREE.Color(0xffffff),
             reflectivity: 1.0,
             clearcoat: 1.0,
             clearcoatRoughness: 0.0,
-            attenuationColor: new THREE.Color(0xffffff),
-            attenuationDistance: 40,
+            attenuationColor: new THREE.Color(0xFF8C00), // orange — thick areas absorb more, deepen in colour
+            attenuationDistance: 18,   // shorter = colour builds up faster through the depth
             side: THREE.DoubleSide,
         });
 

@@ -236,54 +236,6 @@ function initStackedCardsSlider() {
         });
 }
 
-//Custom cursor
-function initBasicCustomCursor() {
-    gsap.set(".cursor", { xPercent: -50, yPercent: -50 });
-
-    let xTo = gsap.quickTo(".cursor", "x", { duration: 0.6, ease: "power3" });
-    let yTo = gsap.quickTo(".cursor", "y", { duration: 0.6, ease: "power3" });
-
-    window.addEventListener("mousemove", (e) => {
-        xTo(e.clientX);
-        yTo(e.clientY);
-    });
-}
-
-//Footer parallax
-function initFooterParallax() {
-    document.querySelectorAll("[data-footer-parallax]").forEach((el) => {
-        const tl = gsap.timeline({
-            scrollTrigger: {
-                trigger: el,
-                start: "clamp(top bottom)",
-                end: "clamp(top top)",
-                scrub: true,
-            },
-        });
-
-        const inner = el.querySelector("[data-footer-parallax-inner]");
-        const dark = el.querySelector("[data-footer-parallax-dark]");
-
-        if (inner) {
-            tl.from(inner, {
-                yPercent: -25,
-                ease: "linear",
-            });
-        }
-
-        if (dark) {
-            tl.from(
-                dark,
-                {
-                    opacity: 0.5,
-                    ease: "linear",
-                },
-                "<",
-            );
-        }
-    });
-}
-
 function initFlipOnScroll() {
     let wrapperElements = document.querySelectorAll(
         "[data-flip-element='wrapper']",
@@ -754,8 +706,6 @@ function initOverlappingSlider() {
 
 document.addEventListener("DOMContentLoaded", () => {
     initStackedCardsSlider();
-    initBasicCustomCursor();
-    initFooterParallax();
     initFlipOnScroll();
     initPreviewFollower();
     initMarqueeScrollDirection();

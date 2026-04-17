@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Footer WebGL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #1a0800; }
+    canvas { display: block; width: 100% !important; height: 100% !important; }
+  </style>
+</head>
+<body>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ── Renderer ──────────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+// ── Scene & orthographic camera ───────────────────────────────────────────────
+// Work in a virtual 1440×600 coordinate space matching the original asset sizes.
+const W = 1440, H = 600;
+const scene = new THREE.Scene();
+
+function makeCamera() {
+  const aspect = window.innerWidth / window.innerHeight;
+  const vh = H;
+  const vw = vh * aspect;
+  return new THREE.OrthographicCamera(-vw / 2, vw / 2, vh / 2, -vh / 2, -100, 100);
+}
+let camera = makeCamera();
+
+// ── Texture loader ────────────────────────────────────────────────────────────
+const loader = new THREE.TextureLoader();
+function loadTex(path) {
+  return new Promise((resolve, reject) => loader.load(
+    path,
+    t => { t.colorSpace = THREE.SRGBColorSpace; resolve(t); },
+    undefined,
+    err => reject(new Error(`Failed to load ${path}: ${err}`))
+  ));
+}
+
+// ── Helper: full-scene textured plane ─────────────────────────────────────────
+function makePlane(texture, w, h, z, opacity = 1) {
+  const mat = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: opacity < 1 || texture.format === THREE.RGBAFormat,
+    opacity,
+    depthWrite: false,
+  });
+  // Detect alpha channel from PNG
+  if (texture.image && texture.image.src && texture.image.src.endsWith('.png')) {
+    mat.transparent = true;
+  }
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  mesh.position.z = z;
+  return mesh;
+}
+
+// ── Load all assets then build scene ─────────────────────────────────────────
+let bgTex, shade1Tex, shade2Tex, logoTex;
+try {
+  [bgTex, shade1Tex, shade2Tex, logoTex] = await Promise.all([
+    loadTex('assets/footer-bg.jpg'),
+    loadTex('assets/shade-01.png'),
+    loadTex('assets/shade-02.png'),
+    loadTex('assets/logo-glass.png'),
+  ]);
+} catch (e) {
+  console.error('Texture load failed — serve via a local server (file:// is blocked by CORS).\n', e);
+}
+
+// Background — covers full virtual canvas, no parallax
+const bg = makePlane(bgTex, W, H, -10);
+scene.add(bg);
+
+// Shade 01 — top shadow, gentle parallax
+const shade1 = makePlane(shade1Tex, W, H, 0);
+scene.add(shade1);
+
+// Logo — centred, prominent parallax + float animation
+// Source is 997×1050, display at roughly 380px wide in the 1440-unit space
+const logoAspect = 997 / 1050;
+const logoH = 400;
+const logoW = logoH * logoAspect;
+logoTex.premultiplyAlpha = false;
+const logo = makePlane(logoTex, logoW, logoH, 5);
+logo.material.transparent = true;
+scene.add(logo);
+
+// Shade 02 — bottom highlight, subtle parallax, sits above logo
+const shade2 = makePlane(shade2Tex, W * 0.77, H * 0.81, 8);
+shade2.position.y = -H * 0.1;
+scene.add(shade2);
+
+
+// ── Parallax state ────────────────────────────────────────────────────────────
+// Each layer has a multiplier: higher = moves more with the mouse
+const LAYERS = [
+  { mesh: bg,     mx: 0.0,  my: 0.0  },
+  { mesh: shade1, mx: 0.4,  my: 0.2  },
+  { mesh: logo,   mx: 1.8,  my: 1.2  },
+  { mesh: shade2, mx: 0.8,  my: 0.5  },
+];
+
+// Max pixel offset in virtual space (at full mouse deflection)
+const MAX_OFFSET = 28;
+
+let mouseNX = 0, mouseNY = 0; // normalised −1..1
+let curNX   = 0, curNY   = 0; // smoothed
+
+// ── Animation ─────────────────────────────────────────────────────────────────
+// Gentle vertical float for the logo
+const FLOAT_AMP  = 10;   // pixels (virtual space)
+const FLOAT_FREQ = 0.5;  // Hz
+
+// ── Mouse tracking ────────────────────────────────────────────────────────────
+window.addEventListener('mousemove', e => {
+  mouseNX =  (e.clientX / window.innerWidth  - 0.5) * 2;
+  mouseNY = -(e.clientY / window.innerHeight - 0.5) * 2;
+  startRender();
+});
+
+window.addEventListener('message', e => {
+  if (e.data?.type === 'LOGO3D_MOUSE') {
+    mouseNX =  e.data.nx;
+    mouseNY = -e.data.ny;
+    startRender();
+  }
+  if (e.data?.type === 'LOGO3D_RESET') {
+    mouseNX = 0; mouseNY = 0; startRender();
+  }
+});
+
+window.addEventListener('mouseleave', () => { mouseNX = 0; mouseNY = 0; startRender(); });
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera = makeCamera();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  startRender();
+});
+
+// ── Render loop (demand-driven) ───────────────────────────────────────────────
+const LERP       = 0.06;
+const SETTLE_EPS = 0.0002;
+let rafId = null;
+let clock = new THREE.Clock();
+
+function tick() {
+  const t  = clock.getElapsedTime();
+  const dx = mouseNX - curNX;
+  const dy = mouseNY - curNY;
+  curNX += dx * LERP;
+  curNY += dy * LERP;
+
+  // Apply parallax to each layer's base position
+  LAYERS.forEach(({ mesh, mx, my }) => {
+    mesh.position.x = curNX * MAX_OFFSET * mx;
+    mesh.position.y = curNY * MAX_OFFSET * my;
+  });
+
+  // Float animation: set on top of the parallax y (don't accumulate)
+  logo.position.y = curNY * MAX_OFFSET * 1.2 + Math.sin(t * Math.PI * 2 * FLOAT_FREQ) * FLOAT_AMP;
+
+  renderer.render(scene, camera);
+
+  // Always loop — float animation runs continuously
+  rafId = requestAnimationFrame(tick);
+}
+
+function startRender() {
+  if (!rafId) rafId = requestAnimationFrame(tick);
+}
+
+// Visibility & intersection pause
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { cancelAnimationFrame(rafId); rafId = null; }
+  else startRender();
+});
+new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting) startRender();
+  else { cancelAnimationFrame(rafId); rafId = null; }
+}, { threshold: 0.1 }).observe(renderer.domElement);
+
+startRender();
+</script>
+</body>
+</html>
