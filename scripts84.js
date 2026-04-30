@@ -286,6 +286,13 @@ function initFlipOnScroll() {
                 );
             }
         });
+
+        tl.fromTo(
+            targetEl,
+            { borderRadius: "0.4rem" },
+            { borderRadius: "2rem", ease: "none", duration: tl.duration() },
+            0,
+        );
     }
 
     flipTimeline();
