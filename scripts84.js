@@ -243,10 +243,14 @@ function initFlipOnScroll() {
     let targetEl = document.querySelector("[data-flip-element='target']");
 
     let tl;
+    let parallaxTween;
     function flipTimeline() {
         if (tl) {
             tl.kill();
             gsap.set(targetEl, { clearProps: "all" });
+        }
+        if (parallaxTween) {
+            parallaxTween.kill();
         }
 
         // Use the first and last wrapper elements for the scroll trigger.
@@ -293,6 +297,17 @@ function initFlipOnScroll() {
             { borderRadius: "2rem", ease: "none", duration: tl.duration() },
             0,
         );
+
+        parallaxTween = gsap.to(targetEl, {
+            y: -80,
+            ease: "none",
+            scrollTrigger: {
+                trigger: wrapperElements[wrapperElements.length - 1],
+                start: "center center",
+                end: "bottom top",
+                scrub: 0.25,
+            },
+        });
     }
 
     flipTimeline();
