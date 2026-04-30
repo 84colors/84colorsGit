@@ -298,7 +298,8 @@ function initFlipOnScroll() {
             0,
         );
 
-        parallaxTween = gsap.to(targetEl, {
+        let parallaxEl = targetEl.querySelector(".scaling-video__video");
+        parallaxTween = gsap.to(parallaxEl, {
             y: -80,
             ease: "none",
             scrollTrigger: {
