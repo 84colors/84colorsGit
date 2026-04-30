@@ -546,7 +546,18 @@ function initMarqueeScrollDirection() {
 }
 
 //Nav scroll
-// is-active
+console.log("is-scrolled");
+
+//Change nav button
+window.addEventListener("scroll", function () {
+    const nav = document.querySelectorAll(".navbar");
+
+    if (window.scrollY > 0) {
+        nav.forEach((nav) => nav.classList.add("is-small"));
+    } else {
+        nav.forEach((nav) => nav.classList.remove("is-small"));
+    }
+});
 
 //Slider
 function initOverlappingSlider() {
