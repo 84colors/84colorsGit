@@ -293,7 +293,7 @@ function initFlipOnScroll() {
 
         tl.fromTo(
             targetEl,
-            { borderRadius: "0.4rem" },
+            { borderRadius: "1.4rem" },
             { borderRadius: "2rem", ease: "none", duration: tl.duration() },
             0,
         );
@@ -559,6 +559,146 @@ window.addEventListener("scroll", function () {
     }
 });
 
+function initServiceCursor() {
+    const cursor = document.querySelector(".cursor");
+    const cursorText = document.querySelector(".cursor-text");
+    const cursorScroll = document.querySelector(".cursor-scroll");
+
+    if (!cursor && !cursorText && !cursorScroll) return;
+
+    //Edit speed
+    const duration = 0.3;
+    const ease = "power3";
+
+    //Edit offset
+    const yOffset =
+        parseFloat(getComputedStyle(document.documentElement).fontSize) * 2;
+
+    const setupCursor = (el) => {
+        gsap.set(el, {
+            top: 0,
+            left: 0,
+            xPercent: -50,
+            yPercent: -50,
+            scale: 0,
+            autoAlpha: 0,
+        });
+        return {
+            xTo: gsap.quickTo(el, "x", { duration, ease }),
+            yTo: gsap.quickTo(el, "y", { duration, ease }),
+        };
+    };
+
+    const activeCursors = [];
+    if (cursor) activeCursors.push({ el: cursor, ...setupCursor(cursor) });
+    if (cursorText)
+        activeCursors.push({ el: cursorText, ...setupCursor(cursorText) });
+    if (cursorScroll)
+        activeCursors.push({ el: cursorScroll, ...setupCursor(cursorScroll) });
+
+    let positioned = false;
+
+    window.addEventListener("mousemove", (e) => {
+        if (!positioned) {
+            activeCursors.forEach(({ el }) =>
+                gsap.set(el, { x: e.clientX, y: e.clientY - yOffset }),
+            );
+            positioned = true;
+        }
+        activeCursors.forEach(({ xTo, yTo }) => {
+            xTo(e.clientX);
+            yTo(e.clientY - yOffset);
+        });
+    });
+
+    if (cursor) {
+        document.querySelectorAll("[data-cursor-trigger]").forEach((card) => {
+            card.addEventListener("mouseenter", () => {
+                gsap.to(cursor, {
+                    scale: 1,
+                    autoAlpha: 1,
+                    duration: 0.4,
+                    ease: "back.out(1.7)",
+                    overwrite: "auto",
+                });
+            });
+            card.addEventListener("mouseleave", () => {
+                gsap.to(cursor, {
+                    scale: 0,
+                    autoAlpha: 0,
+                    duration: 0.3,
+                    ease: "power2.in",
+                    overwrite: "auto",
+                });
+            });
+        });
+    }
+
+    if (cursorScroll) {
+        document.querySelectorAll("[data-cursor-scroll]").forEach((card) => {
+            card.addEventListener("mouseenter", () => {
+                gsap.to(cursorScroll, {
+                    scale: 1,
+                    autoAlpha: 1,
+                    duration: 0.4,
+                    ease: "back.out(1.7)",
+                    overwrite: "auto",
+                });
+            });
+            card.addEventListener("mouseleave", () => {
+                gsap.to(cursorScroll, {
+                    scale: 0,
+                    autoAlpha: 0,
+                    duration: 0.3,
+                    ease: "power2.in",
+                    overwrite: "auto",
+                });
+            });
+        });
+    }
+
+    if (cursorText) {
+        document.querySelectorAll("[data-cursor-text]").forEach((card) => {
+            card.addEventListener("mouseenter", () => {
+                cursorText.textContent = card.dataset.cursorText;
+                gsap.to(cursorText, {
+                    scale: 1,
+                    autoAlpha: 1,
+                    duration: 0.4,
+                    ease: "back.out(1.7)",
+                    overwrite: "auto",
+                });
+            });
+            card.addEventListener("mouseleave", () => {
+                gsap.to(cursorText, {
+                    scale: 0,
+                    autoAlpha: 0,
+                    duration: 0.3,
+                    ease: "power2.in",
+                    overwrite: "auto",
+                });
+            });
+        });
+    }
+}
+
+function initScrollCursorMarquee() {
+    const wrap = document.querySelector(".cursor-wrap-scroll");
+    if (!wrap) return;
+
+    //Edit marquee speed
+    const marqueeDuration = 9;
+
+    wrap.innerHTML += wrap.innerHTML;
+
+    gsap.to(wrap, {
+        xPercent: -50,
+        repeat: -1,
+        ease: "linear",
+        duration: marqueeDuration,
+    });
+}
+
 //Slider
 function initOverlappingSlider() {
     const inits = document.querySelectorAll("[data-overlap-slider-init]");
@@ -743,5 +883,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initFlipOnScroll();
     initPreviewFollower();
     initMarqueeScrollDirection();
+    initServiceCursor();
+    initScrollCursorMarquee();
     initOverlappingSlider();
 });
