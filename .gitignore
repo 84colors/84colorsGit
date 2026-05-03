@@ -9,3 +9,4 @@ cert.pem
 .claude
 COMMANDS.md
 .vscode/settings.json
+*.zip
