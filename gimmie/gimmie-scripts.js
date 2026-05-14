@@ -1,3 +1,5 @@
+console.log("hey there");
+
 (function () {
     "use strict";
 
@@ -46,7 +48,10 @@
                 if (target) target.setAttribute("data-modal-status", "active");
                 if (modal) modal.setAttribute("data-modal-status", "active");
                 if (modalGroup) {
-                    modalGroup.setAttribute("data-modal-group-status", "active");
+                    modalGroup.setAttribute(
+                        "data-modal-group-status",
+                        "active",
+                    );
                 }
             });
         });
