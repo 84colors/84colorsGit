@@ -313,10 +313,11 @@
         // ── Mouse tracking ────────────────────────────────────────────────────────────
         // dragRot: accumulated via click-drag (unbounded spin)
         // hoverOffset: subtle tilt driven by cursor position (±small range)
-        let dragRotX = 0, dragRotY = 0;
+        const DEFAULT_ROT_Y = THREE.MathUtils.degToRad(4);
+        let dragRotX = 0, dragRotY = DEFAULT_ROT_Y;
         let hoverOffsetX = 0, hoverOffsetY = 0;
-        let targetRotX = 0, targetRotY = 0;
-        let currentRotX = 0, currentRotY = 0;
+        let targetRotX = 0, targetRotY = DEFAULT_ROT_Y;
+        let currentRotX = 0, currentRotY = DEFAULT_ROT_Y;
         let isDragging = false;
         let lastDragX = 0, lastDragY = 0;
         const DRAG_SPEED = 0.008; // radians per pixel
