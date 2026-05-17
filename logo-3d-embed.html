@@ -33,7 +33,8 @@
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/",
+    "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm"
   }
 }
 </script>
@@ -44,6 +45,7 @@
         import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
         import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+        import GUI from 'lil-gui';
 
         // ── SVG source ────────────────────────────────────────────────────────────────
         const SVG_SOURCE = `<svg width="218" height="218" viewBox="0 0 218 218" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -61,7 +63,7 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 4.2;
+        renderer.toneMappingExposure = 1.9;
         renderer.setClearColor(0x000000, 0); // fully transparent
         document.body.appendChild(renderer.domElement);
 
@@ -233,34 +235,35 @@
         // No scene.background — keep transparent for Webflow
 
         // ── Direct lights ─────────────────────────────────────────────────────────────
-        const keyLight = new THREE.DirectionalLight(0xfff0b0, 4.0);  // warm yellow-white
+        const keyLight = new THREE.DirectionalLight(0xff6905, 4.3);
         keyLight.position.set(-80, 120, 100);
         scene.add(keyLight);
 
-        const fillLight = new THREE.DirectionalLight(0xff9030, 1.8); // orange fill
+        const fillLight = new THREE.DirectionalLight(0xff9030, 5.5);
         fillLight.position.set(100, -40, 80);
         scene.add(fillLight);
 
-        const rimLight = new THREE.DirectionalLight(0xffb020, 2.5);  // deep amber rim
+        const rimLight = new THREE.DirectionalLight(0xffb020, 4.1);
         rimLight.position.set(20, -60, -120);
         scene.add(rimLight);
 
         // ── Orange glass material ─────────────────────────────────────────────────────
         const glassMaterial = new THREE.MeshPhysicalMaterial({
-            color: new THREE.Color(0xFF7B2C),
+            color: new THREE.Color(0xFF6105),
             metalness: 0,
             roughness: 0.0,
-            transmission: 0.99,
-            thickness: 50,             // higher than geometry depth = stronger refraction bend
-            ior: 1.65,
+            transmission: 1.0,
+            thickness: 41.5,
+            ior: 1.22,
             transparent: true,
-            specularIntensity: 2.0,
+            specularIntensity: 0.7,
             specularColor: new THREE.Color(0xffffff),
             reflectivity: 1.0,
-            clearcoat: 1.0,
-            clearcoatRoughness: 0.0,
-            attenuationColor: new THREE.Color(0xFF8C00), // orange — thick areas absorb more, deepen in colour
-            attenuationDistance: 18,   // shorter = colour builds up faster through the depth
+            clearcoat: 0.29,
+            clearcoatRoughness: 0.36,
+            attenuationColor: new THREE.Color(0xFFA033),
+            attenuationDistance: 67.5,
+            envMapIntensity: 2.6,
             side: THREE.DoubleSide,
         });
 
@@ -297,46 +300,103 @@
             });
         });
 
-        // Center the group at origin.
-        // The Y-flip must be applied first: with scale.y = -1,
-        // world_y = position.y - local_y, so position.y must equal +center.y (not -center.y)
-        // to keep the centroid at world Y=0.
+        // Translate each mesh's geometry so the logo center sits at local (0,0,0).
+        // Rotation then spins around the visual center, not the SVG corner.
         const box = new THREE.Box3().setFromObject(group);
         const center = box.getCenter(new THREE.Vector3());
+        group.children.forEach(mesh => {
+            mesh.geometry.translate(-center.x, -center.y, -center.z);
+        });
+        // Flip Y to convert SVG (Y-down) to Three.js (Y-up) space.
         group.scale.y *= -1;
-        group.position.set(-center.x, center.y, -center.z);
 
         scene.add(group);
 
         // ── Mouse tracking ────────────────────────────────────────────────────────────
-        let targetRotX = 0;
-        let targetRotY = 0;
-        let currentRotX = 0;
-        let currentRotY = 0;
+        // dragRot: accumulated via click-drag (unbounded spin)
+        // hoverOffset: subtle tilt driven by cursor position (±small range)
+        let dragRotX = 0, dragRotY = 0;
+        let hoverOffsetX = 0, hoverOffsetY = 0;
+        let targetRotX = 0, targetRotY = 0;
+        let currentRotX = 0, currentRotY = 0;
+        let isDragging = false;
+        let lastDragX = 0, lastDragY = 0;
+        const DRAG_SPEED = 0.008; // radians per pixel
 
         function applyMouse(nx, ny) {
-            targetRotY = nx * Math.PI * 0.11;
-            targetRotX = -ny * Math.PI * 0.08;
-            startRender(); // wake the loop if it has settled
+            if (isDragging) return;
+            hoverOffsetY = nx * Math.PI * 0.11;
+            hoverOffsetX = ny * Math.PI * 0.08;  // positive ny (mouse down) tilts top toward viewer
+            targetRotX = dragRotX + hoverOffsetX;
+            targetRotY = dragRotY + hoverOffsetY;
+            startRender();
         }
 
-        // Direct mouse — works when the HTML is used inline (not iframe)
-        window.addEventListener('mousemove', (e) => {
-            applyMouse(
-                (e.clientX / window.innerWidth - 0.5) * 2,
-                (e.clientY / window.innerHeight - 0.5) * 2
+        function startDrag(x, y) {
+            isDragging = true;
+            lastDragX = x;
+            lastDragY = y;
+        }
+
+        function moveDrag(x, y) {
+            const dx = x - lastDragX;
+            const dy = y - lastDragY;
+            lastDragX = x;
+            lastDragY = y;
+            dragRotY += dx * DRAG_SPEED;
+            dragRotX += dy * DRAG_SPEED;
+            targetRotX = dragRotX + hoverOffsetX;
+            targetRotY = dragRotY + hoverOffsetY;
+            startRender();
+        }
+
+        function endDrag() {
+            isDragging = false;
+            renderer.domElement.style.cursor = '';
+        }
+
+        // Raycaster — restrict drag to clicks that land on the logo mesh
+        const raycaster = new THREE.Raycaster();
+        function hitsLogo(clientX, clientY) {
+            const ndc = new THREE.Vector2(
+                (clientX / window.innerWidth) * 2 - 1,
+                -(clientY / window.innerHeight) * 2 + 1
             );
+            raycaster.setFromCamera(ndc, camera);
+            return raycaster.intersectObjects(group.children, false).length > 0;
+        }
+
+        // Mouse
+        window.addEventListener('mousedown', (e) => {
+            if (hitsLogo(e.clientX, e.clientY)) {
+                startDrag(e.clientX, e.clientY);
+                renderer.domElement.style.cursor = 'grabbing';
+            }
+        });
+        window.addEventListener('mouseup', endDrag);
+        window.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                moveDrag(e.clientX, e.clientY);
+            } else {
+                renderer.domElement.style.cursor = hitsLogo(e.clientX, e.clientY) ? 'grab' : '';
+                applyMouse(
+                    (e.clientX / window.innerWidth - 0.5) * 2,
+                    (e.clientY / window.innerHeight - 0.5) * 2
+                );
+            }
         });
 
-        // Touch support
+        // Touch
+        window.addEventListener('touchstart', (e) => {
+            if (!e.touches.length) return;
+            if (hitsLogo(e.touches[0].clientX, e.touches[0].clientY))
+                startDrag(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: true });
         window.addEventListener('touchmove', (e) => {
             if (!e.touches.length) return;
-            const t = e.touches[0];
-            applyMouse(
-                (t.clientX / window.innerWidth - 0.5) * 2,
-                (t.clientY / window.innerHeight - 0.5) * 2
-            );
+            moveDrag(e.touches[0].clientX, e.touches[0].clientY);
         }, { passive: true });
+        window.addEventListener('touchend', endDrag, { passive: true });
 
         // postMessage — works when embedded as an iframe.
         // The parent Webflow page needs this snippet in its custom code:
@@ -358,10 +418,20 @@
         //
         window.addEventListener('message', (e) => {
             if (e.data?.type === 'LOGO3D_MOUSE') applyMouse(e.data.nx, e.data.ny);
-            if (e.data?.type === 'LOGO3D_RESET') { targetRotX = 0; targetRotY = 0; }
+            if (e.data?.type === 'LOGO3D_RESET') {
+                dragRotX = 0; dragRotY = 0;
+                hoverOffsetX = 0; hoverOffsetY = 0;
+                targetRotX = 0; targetRotY = 0;
+                startRender();
+            }
         });
 
-        window.addEventListener('mouseleave', () => { targetRotX = 0; targetRotY = 0; startRender(); });
+        window.addEventListener('mouseleave', () => {
+            isDragging = false;
+            hoverOffsetX = 0; hoverOffsetY = 0;
+            targetRotX = dragRotX; targetRotY = dragRotY;
+            startRender();
+        });
 
         // ── Resize handler ────────────────────────────────────────────────────────────
         window.addEventListener('resize', () => {
@@ -425,6 +495,63 @@
                 rafId = null;
             }
         }, { threshold: 0.1 }).observe(renderer.domElement);
+
+        // ── Tweak GUI ─────────────────────────────────────────────────────────────────
+        const gui = new GUI({ title: 'Material & Lighting', width: 280 });
+
+        // Material
+        const matFolder = gui.addFolder('Material');
+        const matParams = {
+            color: '#' + glassMaterial.color.getHexString(),
+            roughness: glassMaterial.roughness,
+            transmission: glassMaterial.transmission,
+            thickness: glassMaterial.thickness,
+            ior: glassMaterial.ior,
+            attenuationColor: '#' + glassMaterial.attenuationColor.getHexString(),
+            attenuationDist: glassMaterial.attenuationDistance,
+            specularIntensity: glassMaterial.specularIntensity,
+            clearcoat: glassMaterial.clearcoat,
+            clearcoatRoughness: glassMaterial.clearcoatRoughness,
+        };
+        matFolder.addColor(matParams, 'color').onChange(v => { glassMaterial.color.set(v); startRender(); });
+        matFolder.add(matParams, 'roughness', 0, 1, 0.01).onChange(v => { glassMaterial.roughness = v; startRender(); });
+        matFolder.add(matParams, 'transmission', 0, 1, 0.01).onChange(v => { glassMaterial.transmission = v; startRender(); });
+        matFolder.add(matParams, 'thickness', 0, 120, 0.5).onChange(v => { glassMaterial.thickness = v; startRender(); });
+        matFolder.add(matParams, 'ior', 1, 2.5, 0.01).onChange(v => { glassMaterial.ior = v; startRender(); });
+        matFolder.addColor(matParams, 'attenuationColor').onChange(v => { glassMaterial.attenuationColor.set(v); startRender(); });
+        matFolder.add(matParams, 'attenuationDist', 1, 100, 0.5).onChange(v => { glassMaterial.attenuationDistance = v; startRender(); });
+        matFolder.add(matParams, 'specularIntensity', 0, 4, 0.05).onChange(v => { glassMaterial.specularIntensity = v; startRender(); });
+        matFolder.add(matParams, 'clearcoat', 0, 1, 0.01).onChange(v => { glassMaterial.clearcoat = v; startRender(); });
+        matFolder.add(matParams, 'clearcoatRoughness', 0, 1, 0.01).onChange(v => { glassMaterial.clearcoatRoughness = v; startRender(); });
+
+        // Lights
+        function addLightFolder(parent, light, label) {
+            const lp = { color: '#' + light.color.getHexString(), intensity: light.intensity };
+            const f = parent.addFolder(label);
+            f.addColor(lp, 'color').onChange(v => { light.color.set(v); startRender(); });
+            f.add(lp, 'intensity', 0, 12, 0.1).onChange(v => { light.intensity = v; startRender(); });
+            f.close();
+        }
+        const lightsFolder = gui.addFolder('Lights');
+        addLightFolder(lightsFolder, keyLight, 'Key');
+        addLightFolder(lightsFolder, fillLight, 'Fill');
+        addLightFolder(lightsFolder, rimLight, 'Rim');
+
+        // Environment — this is the dominant light source for glass/transmission materials.
+        // Direct lights only add faint specular highlights; the env map drives reflections
+        // and refraction (what you see through and in the glass).
+        scene.environmentIntensity = 0.35;
+        scene.environmentRotation.y = THREE.MathUtils.degToRad(152);
+        const envFolder = gui.addFolder('Environment (main light source)');
+        const envParams = { sceneIntensity: 0.35, materialIntensity: glassMaterial.envMapIntensity, rotation: 152 };
+        envFolder.add(envParams, 'sceneIntensity', 0, 3, 0.05).name('scene intensity').onChange(v => { scene.environmentIntensity = v; startRender(); });
+        envFolder.add(envParams, 'materialIntensity', 0, 3, 0.05).name('material intensity').onChange(v => { glassMaterial.envMapIntensity = v; startRender(); });
+        envFolder.add(envParams, 'rotation', 0, 360, 1).name('rotation').onChange(v => { scene.environmentRotation.y = THREE.MathUtils.degToRad(v); startRender(); });
+
+        // Renderer
+        const rendererFolder = gui.addFolder('Renderer');
+        const rendererParams = { exposure: renderer.toneMappingExposure };
+        rendererFolder.add(rendererParams, 'exposure', 0, 10, 0.1).onChange(v => { renderer.toneMappingExposure = v; startRender(); });
     </script>
 </body>
 </html>
