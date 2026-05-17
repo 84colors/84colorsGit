@@ -33,8 +33,7 @@
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/",
-    "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm"
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
   }
 }
 </script>
@@ -45,7 +44,6 @@
         import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
         import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
         import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
-        import GUI from 'lil-gui';
 
         // ── SVG source ────────────────────────────────────────────────────────────────
         const SVG_SOURCE = `<svg width="218" height="218" viewBox="0 0 218 218" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -496,62 +494,8 @@
             }
         }, { threshold: 0.1 }).observe(renderer.domElement);
 
-        // ── Tweak GUI ─────────────────────────────────────────────────────────────────
-        const gui = new GUI({ title: 'Material & Lighting', width: 280 });
-
-        // Material
-        const matFolder = gui.addFolder('Material');
-        const matParams = {
-            color: '#' + glassMaterial.color.getHexString(),
-            roughness: glassMaterial.roughness,
-            transmission: glassMaterial.transmission,
-            thickness: glassMaterial.thickness,
-            ior: glassMaterial.ior,
-            attenuationColor: '#' + glassMaterial.attenuationColor.getHexString(),
-            attenuationDist: glassMaterial.attenuationDistance,
-            specularIntensity: glassMaterial.specularIntensity,
-            clearcoat: glassMaterial.clearcoat,
-            clearcoatRoughness: glassMaterial.clearcoatRoughness,
-        };
-        matFolder.addColor(matParams, 'color').onChange(v => { glassMaterial.color.set(v); startRender(); });
-        matFolder.add(matParams, 'roughness', 0, 1, 0.01).onChange(v => { glassMaterial.roughness = v; startRender(); });
-        matFolder.add(matParams, 'transmission', 0, 1, 0.01).onChange(v => { glassMaterial.transmission = v; startRender(); });
-        matFolder.add(matParams, 'thickness', 0, 120, 0.5).onChange(v => { glassMaterial.thickness = v; startRender(); });
-        matFolder.add(matParams, 'ior', 1, 2.5, 0.01).onChange(v => { glassMaterial.ior = v; startRender(); });
-        matFolder.addColor(matParams, 'attenuationColor').onChange(v => { glassMaterial.attenuationColor.set(v); startRender(); });
-        matFolder.add(matParams, 'attenuationDist', 1, 100, 0.5).onChange(v => { glassMaterial.attenuationDistance = v; startRender(); });
-        matFolder.add(matParams, 'specularIntensity', 0, 4, 0.05).onChange(v => { glassMaterial.specularIntensity = v; startRender(); });
-        matFolder.add(matParams, 'clearcoat', 0, 1, 0.01).onChange(v => { glassMaterial.clearcoat = v; startRender(); });
-        matFolder.add(matParams, 'clearcoatRoughness', 0, 1, 0.01).onChange(v => { glassMaterial.clearcoatRoughness = v; startRender(); });
-
-        // Lights
-        function addLightFolder(parent, light, label) {
-            const lp = { color: '#' + light.color.getHexString(), intensity: light.intensity };
-            const f = parent.addFolder(label);
-            f.addColor(lp, 'color').onChange(v => { light.color.set(v); startRender(); });
-            f.add(lp, 'intensity', 0, 12, 0.1).onChange(v => { light.intensity = v; startRender(); });
-            f.close();
-        }
-        const lightsFolder = gui.addFolder('Lights');
-        addLightFolder(lightsFolder, keyLight, 'Key');
-        addLightFolder(lightsFolder, fillLight, 'Fill');
-        addLightFolder(lightsFolder, rimLight, 'Rim');
-
-        // Environment — this is the dominant light source for glass/transmission materials.
-        // Direct lights only add faint specular highlights; the env map drives reflections
-        // and refraction (what you see through and in the glass).
         scene.environmentIntensity = 0.35;
         scene.environmentRotation.y = THREE.MathUtils.degToRad(152);
-        const envFolder = gui.addFolder('Environment (main light source)');
-        const envParams = { sceneIntensity: 0.35, materialIntensity: glassMaterial.envMapIntensity, rotation: 152 };
-        envFolder.add(envParams, 'sceneIntensity', 0, 3, 0.05).name('scene intensity').onChange(v => { scene.environmentIntensity = v; startRender(); });
-        envFolder.add(envParams, 'materialIntensity', 0, 3, 0.05).name('material intensity').onChange(v => { glassMaterial.envMapIntensity = v; startRender(); });
-        envFolder.add(envParams, 'rotation', 0, 360, 1).name('rotation').onChange(v => { scene.environmentRotation.y = THREE.MathUtils.degToRad(v); startRender(); });
-
-        // Renderer
-        const rendererFolder = gui.addFolder('Renderer');
-        const rendererParams = { exposure: renderer.toneMappingExposure };
-        rendererFolder.add(rendererParams, 'exposure', 0, 10, 0.1).onChange(v => { renderer.toneMappingExposure = v; startRender(); });
     </script>
 </body>
 </html>
