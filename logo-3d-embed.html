@@ -323,8 +323,8 @@
 
         function applyMouse(nx, ny) {
             if (isDragging) return;
-            hoverOffsetY = nx * Math.PI * 0.11;
-            hoverOffsetX = ny * Math.PI * 0.08;  // positive ny (mouse down) tilts top toward viewer
+            hoverOffsetY = nx * Math.PI * 0.21;
+            hoverOffsetX = ny * Math.PI * 0.21;  // positive ny (mouse down) tilts top toward viewer
             targetRotX = dragRotX + hoverOffsetX;
             targetRotY = dragRotY + hoverOffsetY;
             startRender();
