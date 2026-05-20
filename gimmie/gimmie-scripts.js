@@ -69,7 +69,10 @@ console.log("hey there");
     // Vimeo Thumbnail Player
     // ============================================================
     function initVimeoThumbs() {
-        const thumbWraps = document.querySelectorAll(".thumb-wrap");
+        const thumbWraps = document.querySelectorAll(
+            ".thumb-wrap, .reel-play-btn",
+        );
+
         if (!thumbWraps.length) return;
 
         thumbWraps.forEach((thumbWrap) => {
